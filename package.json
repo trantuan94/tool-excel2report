@@ -1,0 +1,33 @@
+{
+  "name": "tool-excel2report",
+  "version": "1.0.0",
+  "description": "Tool export report from excel file",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "electron ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/trantuan94/tool-excel2report.git"
+  },
+  "keywords": [
+    "Tool",
+    "excel2report"
+  ],
+  "author": "Tran Tuan",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/trantuan94/tool-excel2report/issues"
+  },
+  "homepage": "https://github.com/trantuan94/tool-excel2report#readme",
+  "devDependencies": {
+    "electron": "^9.0.5"
+  },
+  "dependencies": {
+    "bootstrap": "^4.5.0",
+    "jquery": "^3.5.1",
+    "popper.js": "^1.16.1",
+    "xlsx": "^0.16.3"
+  }
+}

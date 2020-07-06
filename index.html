@@ -1,0 +1,274 @@
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Tool Export Report From Excel File</title>
+    <!-- https://electronjs.org/docs/tutorial/security#csp-meta-tag -->
+    <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';" />
+    <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css">
+    <style type="text/css">
+      th, td {
+        padding: 5px auto !important;
+      }
+    </style>
+    <script type="text/javascript">
+      window.$ = require('jquery');
+    </script>
+    <script>require('popper.js');</script>
+    <script>require('bootstrap');</script>
+    <script>
+      var XLSX = require('xlsx');
+    </script>
+  </head>
+  <body>
+    <div class="container-fluid">
+      <div class="loading"></div>
+      <form class="form form-horizontal">
+        <div class="row">
+          <div class="col-12 text-center mb-3 mt-3">
+            <h5>Tool xuất báo cáo bán sách từ file Excel</h5>
+          </div>
+          <div class="col-6 pb-3">
+              <label class="label" for="#inp-excel-file">Chọn file Excel:</label>
+              <input required type="file" id="inp-excel-file" class="form-control form-sm-control" placeholder="Chọn file excel..." />
+          </div>
+          <div class="col-6 pb-3">
+            <label for="#sel_sheet" class="label">Chọn sheet:</label>
+            <select value="" class="form-control form-sm-control" id="sel_sheet" placeholder="Chọn sheet dữ liệu...">
+              <option class="option" value="" >Chọn sheet dữ liệu...</option>
+            </select>
+          </div>
+          <div class="col-12 pb-3 text-right">
+            <button type="button" class="btn btn-sm btn-warning" id="btn-configure">Cấu hình đọc file Excel</button>
+          </div>
+          <div class="col-12">
+            <div id="filepath"></div>
+          </div>
+          <div class="col-12 table-responsive">
+            <h6>Dữ liệu đọc đuợc từ file:</h6>
+            <table class="table table-striped responsive table-bordered">
+              <thead class="thead-dark">
+                <tr id="table_header">
+                </tr>
+              </thead>
+              <tbody id="table_body">
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </form>
+    </div>
+  </body>
+  <script type="text/javascript">
+    var startRowToGetData = 3;
+    var file
+    var sheetName
+    var fields = [
+      {
+        name: 'date',
+        displayName: 'Ngày',
+        columnLabel: 'A',
+        width: '70px',
+        dataType: 'string',
+        format: {
+          type: 'date',
+          option: 'DD/MM/YY'
+        }
+      },
+      {
+        name: 'paymentBookNo',
+        displayName: 'Q',
+        columnLabel: 'B',
+        width: '70px',
+        dataType: 'string|number',
+        format: 'string',
+      },
+      {
+        name: 'paymentBillCode',
+        displayName: 'PC',
+        columnLabel: 'C',
+        width: '70px',
+        dataType: 'number|string',
+        format: 'string'
+      },
+      {
+        name: 'cashBookNo',
+        displayName: 'Q',
+        columnLabel: 'D',
+        width: '70px',
+        dataType: 'number|string',
+        format: 'string'
+      },
+      {
+        name: 'cashBillNo',
+        displayName: 'PT',
+        columnLabel: 'E',
+        width: '70px',
+        dataType: 'number|string',
+        format: 'string',
+      },
+      {
+        name: 'student',
+        displayName: 'Tên SV',
+        columnLabel: 'F',
+        width: '200px',
+        dataType: 'string',
+        format: 'string',
+      },
+      {
+        name: 'institute',
+        displayName: 'Khoa',
+        columnLabel: 'G',
+        width: '60px',
+        dataType: 'string',
+        format: 'string',
+      },
+      {
+        name: 'className',
+        displayName: 'Lớp',
+        columnLabel: 'H',
+        width: '70px',
+        dataType: 'string',
+        format: 'string',
+      },
+      {
+        name: 'course',
+        displayName: 'Khóa',
+        columnLabel: 'I',
+        width: '50px',
+        dataType: 'string|number',
+        format: 'string',
+      },
+      {
+        name: 'bookName',
+        displayName: 'Tên sách',
+        columnLabel: 'J',
+        width: '220px',
+        dataType: 'string',
+        format: 'string',
+      },
+      {
+        name: 'quantity',
+        displayName: 'SL',
+        columnLabel: 'N',
+        width: '70px',
+        dataType: 'number',
+        format: 'number',
+      },
+      {
+        name: 'price',
+        displayName: 'Đơn giá',
+        columnLabel: 'O',
+        width: '110px',
+        dataType: 'number',
+        format: 'number',
+      },
+      {
+        name: 'amount',
+        displayName: 'Thành tiền',
+        columnLabel: 'P',
+        width: '150px',
+        dataType: 'number',
+        format: 'number',
+      },
+      {
+        name: 'remain',
+        displayName: 'Tồn',
+        columnLabel: 'Q',
+        width: '200px',
+        dataType: 'number',
+        format: 'number',
+      }
+    ];
+    let workbook
+    let sheetsData = {};
+    let onLoad = false;
+    $(document).ready(function() {
+      renderTableHeader();
+      // xu ly chon file excel
+      $('#inp-excel-file').on('change', function(e) {
+        let file = e.target.files[0];
+        readExcelFile(file);
+      });
+      // xu ly chon sheet trong file excel.
+      $('#sel_sheet').on('change', function(e) {
+        let sheetName = e.target.value;
+        if (sheetName) {
+          let sheetData = getDataOfSheet(sheetName);
+          if (sheetData) {
+            renderTableRowsOfDataSheet(sheetData);
+          }
+        }
+      })
+
+      //
+    });
+
+    function renderSelectSheetField(sheets) {
+      let optionEle = '<option value="">Chọn sheet dữ liệu...</option>';
+      if (Array.isArray(sheets)) {
+        for (let sheet of sheets) {
+          optionEle += `<option value="${sheet}">${sheet}</option>`
+        }
+      }
+
+      $('#sel_sheet').html(optionEle);
+    }
+
+    function renderTableHeader () {
+      tblHeader = ''
+      fields.forEach((field) => {
+        tblHeader += `<th style="width: ${field.width || '10%'}">${field.displayName} (${field.columnLabel})<th>`
+      })
+      $('#table_header').html(tblHeader)
+    }
+
+    function renderTableRowsOfDataSheet (data) {
+      console.log('data', data);
+      let rows = '';
+      data.forEach((dt, i) => {
+        if (i >= startRowToGetData - 1) {
+          let row = '';
+        }
+      })
+    }
+
+    function readExcelFile(file) {
+      onLoad = true;
+      let reader = new FileReader();
+      toggleFormControl()
+      reader.onload = function(e) {
+        let data = e.target.result;
+        workbook = XLSX.read(data, {
+          type: 'binary'
+        });
+        workbook.SheetNames.forEach((sheetName) => {
+          let  sheetDataObj = XLSX.utils.sheet_to_row_object_array(workbook.Sheets[sheetName]);
+          sheetsData[sheetName] = sheetDataObj;
+        })
+        renderSelectSheetField(workbook.SheetNames);
+        onLoad = false;
+        toggleFormControl();
+        return
+      };
+      reader.onerror = function(ex) {
+        console.log(ex);
+      };
+      reader.readAsBinaryString(file);
+    }
+
+    function getDataOfSheet(sheetName) {
+      let sheetData = sheetsData[sheetName] || [];
+      return sheetData;
+    }
+
+    function toggleFormControl () {
+      if (onLoad) {
+        $('#sel_sheet').prop('disabled', true);
+        $('#btn-configure').prop('disabled', true);
+      } else {
+        $('#sel_sheet').prop('disabled', false);
+        $('#btn-configure').prop('disabled', false);
+      }
+    }
+  </script>
+</html>
