@@ -1,13 +1,14 @@
 <html>
   <head>
     <meta charset="UTF-8">
-    <title>Tool Export Report From Excel File</title>
+    <title>Tool Xuất báo cáo bán sách</title>
     <!-- https://electronjs.org/docs/tutorial/security#csp-meta-tag -->
     <meta http-equiv="Content-Security-Policy" content="script-src 'self' 'unsafe-inline';" />
     <link rel="stylesheet" href="./node_modules/bootstrap/dist/css/bootstrap.min.css">
     <style type="text/css">
-      th, td {
-        padding: 5px auto !important;
+      table td {
+        padding-top: 2px !important;
+        padding-bottom: 2px !important;
       }
     </style>
     <script type="text/javascript">
@@ -17,57 +18,110 @@
     <script>require('bootstrap');</script>
     <script>
       var XLSX = require('xlsx');
+      var ExcelJS = require('exceljs')
+      const { saveAs } = require("file-saver");
     </script>
   </head>
   <body>
     <div class="container-fluid">
       <div class="loading"></div>
       <form class="form form-horizontal">
-        <div class="row">
+        <div class="row fixed-top pb-2 pr-3 pl-3" style="z-index: 3600; background: #fff; border-bottom: 1px solid #686868;">
           <div class="col-12 text-center mb-3 mt-3">
-            <h5>Tool xuất báo cáo bán sách từ file Excel</h5>
+            <h5><B>TOOL XUẤT BÁO CÁO BÁN SÁCH TỪ FILE EXCEL</B></h5>
           </div>
-          <div class="col-6 pb-3">
+          <div class="col-5 pb-3">
               <label class="label" for="#inp-excel-file">Chọn file Excel:</label>
-              <input required type="file" id="inp-excel-file" class="form-control form-sm-control" placeholder="Chọn file excel..." />
+              <input required type="file" id="inp-excel-file" class="form-control form-control-sm" placeholder="Chọn file excel..." />
           </div>
-          <div class="col-6 pb-3">
+          <div class="col-4 pb-3">
             <label for="#sel_sheet" class="label">Chọn sheet:</label>
-            <select value="" class="form-control form-sm-control" id="sel_sheet" placeholder="Chọn sheet dữ liệu...">
+            <select value="" class="form-control form-control-sm" id="sel_sheet" placeholder="Chọn sheet dữ liệu...">
               <option class="option" value="" >Chọn sheet dữ liệu...</option>
             </select>
           </div>
-          <div class="col-12 pb-3 text-right">
+          <div class="col-3 pb-3">
+            <label>Bắt đầu đọc dữ liệu từ dòng:</label>
+            <input class="form-control form-control-sm" type="number" value="3" id="start_row_data" />
+          </div>
+          <div class="col-4">
+            <label>Học kỳ: </label>
+            <select id="inp_semester" name="semester" value=“1” required class="form-control form-control-sm" >
+              <option value=“”>Chọn học kỳ để in trong báo cáo</option>
+              <option value="1" selected>Học kỳ 1</option>
+              <option value="2">Học kỳ 2</option>
+            </select>
+          </div>
+          <div class="col-3">
+            <label>Năm học</label>
+            <input type="text" required class="form-control form-control-sm" id="inp_schoolyear" name="schoolyear" value="" placeholder=“Điền năm học để in trong báo cáo...”  />
+          </div>
+          <div class="col-5 pt-4 text-right">
+            <button type="button" id="btn_exp_report" class="btn btn-sm btn-primary"> XUẤT BÁO CÁO </button>
             <button type="button" class="btn btn-sm btn-warning" id="btn-configure">Cấu hình đọc file Excel</button>
           </div>
-          <div class="col-12">
-            <div id="filepath"></div>
-          </div>
-          <div class="col-12 table-responsive">
-            <h6>Dữ liệu đọc đuợc từ file:</h6>
-            <table class="table table-striped responsive table-bordered">
-              <thead class="thead-dark">
-                <tr id="table_header">
-                </tr>
-              </thead>
-              <tbody id="table_body">
-              </tbody>
-            </table>
-          </div>
+          
         </div>
       </form>
+      
+      <div class="row" style="margin-top: 200px">
+        <div class="col-12 mt-2 table-responsive">
+          <table class="table table-striped responsive table-hover table-bordered " >
+            <thead class="thead-dark"">
+              <tr id="table_header">
+              </tr>
+            </thead>
+            <tbody id="table_body">
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
   </body>
   <script type="text/javascript">
     var startRowToGetData = 3;
+    var courses = new Set();
     var file
-    var sheetName
+    var sheetName;
+    let today = new Date();
+    let date = ('' + today.getDate()).padStart(2, '0')
+    let month = ('' + (today.getMonth() + 1)).padStart(2, '0');
+    let year = today.getFullYear()
+    var schoolYear, semester = '1';
+    var institutes = [
+      {
+        name: 'Điện tử viễn thông',
+        shortname: 'dtvt',
+        keywords: ['dtvt', 'dt', 'dien tu', 'dien tu vt']
+      },
+      {
+        name: 'Công nghệ thông tin',
+        shortname: 'cntt',
+        keywords: ['cntt', 'cong nghe tt', 'cong nghe thong tin', 'cn tt'],
+      },
+      {
+        name: 'Cơ khí',
+        shortname: 'ck',
+        keywords: ['ck', 'co khi'],
+      },
+      {
+        name: 'Điện',
+        shortname: 'dien',
+        keywords: ['dien', 'd']
+      },
+      {
+        name: 'Kinh tế quản lý',
+        shortname: 'ktql',
+        keywords: ['kt', 'kinh te', 'ktql']
+      },
+    ]
     var fields = [
       {
         name: 'date',
         displayName: 'Ngày',
         columnLabel: 'A',
         width: '70px',
+        style: 'width: 70px; max-width: 70px',
         dataType: 'string',
         format: {
           type: 'date',
@@ -87,6 +141,7 @@
         displayName: 'PC',
         columnLabel: 'C',
         width: '70px',
+        style: "width: 70px; min-width: 70px;",
         dataType: 'number|string',
         format: 'string'
       },
@@ -111,6 +166,7 @@
         displayName: 'Tên SV',
         columnLabel: 'F',
         width: '200px',
+        style: 'min-width: 170px; max-width: 250px;',
         dataType: 'string',
         format: 'string',
       },
@@ -142,7 +198,8 @@
         name: 'bookName',
         displayName: 'Tên sách',
         columnLabel: 'J',
-        width: '220px',
+        width: '250px',
+        style: 'min-width: 200px; max-width: 420px;',
         dataType: 'string',
         format: 'string',
       },
@@ -159,6 +216,7 @@
         displayName: 'Đơn giá',
         columnLabel: 'O',
         width: '110px',
+        style: 'min-width: 110px; width: 110px;',
         dataType: 'number',
         format: 'number',
       },
@@ -167,6 +225,7 @@
         displayName: 'Thành tiền',
         columnLabel: 'P',
         width: '150px',
+        style: 'min-width: 150px; width: 150px;',
         dataType: 'number',
         format: 'number',
       },
@@ -179,30 +238,515 @@
         format: 'number',
       }
     ];
-    let workbook
-    let sheetsData = {};
-    let onLoad = false;
+    var rowStartData = 3;
+    var workbook;
+    var selectedSheet;
+    var sheetsData = {};
+    var onLoad = false;
+    
+
+    let colStyle = {
+      1 : { width: 4, font: { name: "Times New Roman", bold: true, size: '12'}},
+      2 : { width: 16, font: { name: "Times New Roman", bold: true, size: '12'}},
+      3 : { width: 8, numFmt : '#,##0'},
+      4 : { width: 7, numFmt : '#,##0'},
+      5 : { width: 7, numFmt : '#,##0'},
+      6 : { width: 7, numFmt : '#,##0'},
+      7 : { width: 11, numFmt : '#,##0'},
+      8 : { width: 8},
+      9 : { width: 7}, 
+    };
+    let mergeCellHeader = [
+      { start: 'A2', end: 'C2'},
+      { start: "D2", end: "I2" },
+      { start: 'A3', end: 'C3'},
+      { start: 'D3', end: 'I3' },
+      { start: 'A4', end: 'C4' },
+      { start: 'D4', end: 'I4' },
+      { start: 'A5', end: 'I5' },
+      { start: 'A6', end: 'I6' },
+      { start: 'A7', end: 'I7' },
+      { start: 'A8', end: 'A10' },
+      { start: 'B8', end: 'B10' },
+      { start: 'C8', end: 'D8' },
+      { start: 'E8', end: 'G8' },
+      { start: 'C9', end: 'C10' },
+      { start: 'D9', end: 'D10' },
+      { start: 'E9', end: 'E10' },
+      { start: 'F9', end: 'F10' },
+      { start: 'G9', end: 'G10' },
+      { start: 'H8', end: 'H10' },
+      { start: 'I8', end: 'I10' },
+    ];
+
+    let rowsStyleHeader = {
+      2: {
+        font: {
+          bold: false,
+          name: 'Times New Roman',
+          size: '12',
+        },
+        alignment : { 
+          horizontal: 'center',
+          vertical: 'middle',
+          wrapText: false
+        },
+        height  : 20
+      },
+      3: {
+        font: {
+          bold: true,
+          name: 'Times New Roman',
+          size: '12',
+        },
+        alignment : { 
+          horizontal: 'center',
+          vertical: 'middle',
+          wrapText: false
+        },
+        height  : 20
+      },
+      4: {
+        font: {
+          bold: false,
+          name: 'Times New Roman',
+          size: '12',
+        },
+        alignment : { 
+          horizontal: 'right',
+          vertical: 'middle',
+          wrapText: false
+        },
+        height  : 20
+      },
+      5: {
+        font: {
+          bold: true,
+          name: 'Times New Roman',
+          size: '18',
+        },
+        alignment : { 
+          horizontal: 'center',
+          vertical: 'middle',
+          wrapText: false
+        },
+        height  : 24
+      },
+      6: {
+        font: {
+          bold: true,
+          name: 'Times New Roman',
+          size: '14',
+        },
+        alignment : { 
+          horizontal: 'center',
+          vertical: 'middle',
+          wrapText: true
+        },
+        height  : 22
+      },
+      7: {
+        font: {
+          bold: true,
+          name: 'Times New Roman',
+          size: '14',
+        },
+        alignment : { 
+          horizontal: 'center',
+          vertical: 'middle',
+          wrapText: true
+        },
+        height  : 22
+      },
+      8: {
+        font: {
+          bold: true,
+          name: 'Times New Roman',
+          size: '12',
+        },
+        alignment : { 
+          horizontal: 'center',
+          vertical: 'middle',
+          wrapText: true
+        },
+        height  : 22
+      },
+      9: {
+        font: {
+          bold: true,
+          name: 'Times New Roman',
+          size: '12',
+        },
+        alignment : { 
+          horizontal: 'center',
+          vertical: 'middle',
+          wrapText: true
+        },
+        height  : 22
+      },
+      10: {
+        font: {
+          bold: true,
+          name: 'Times New Roman',
+          size: '12',
+        },
+        alignment : { 
+          horizontal: 'center',
+          vertical: 'middle',
+          wrapText: true
+        },
+        height  : 18
+      },
+    };
+  
+    let borderCells = {
+      top: { style: "thin", },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" }
+    }
+    let customCellHeader = {
+      A2: { font: { bold: false, name: 'Times New Roman', size: '10' } },
+      A3: { font: { bold: true, name: 'Times New Roman', size: '10' } },
+      A4: { font: { bold: false, name: 'Times New Roman', size: '10' } },
+      A8: { border: borderCells },
+      B8: { border: borderCells },
+      C8: { border: borderCells },
+      D8: { border: borderCells },
+      E8: { border: borderCells },
+      F8: { border: borderCells },
+      G8: { border: borderCells },
+      H8: { border: borderCells },
+      I8: { border: borderCells },
+      A9: { border: borderCells },
+      B9: { border: borderCells },
+      C9: { border: borderCells },
+      D9: { border: borderCells },
+      E9: { border: borderCells },
+      F9: { border: borderCells },
+      G9: { border: borderCells },
+      H9: { border: borderCells },
+      I9: { border: borderCells },
+    }
+
+    var reportXLS = {}
+
     $(document).ready(function() {
+      schoolYear = month >= 8 ? `${year} - ${year + 1}` : `${year-1} - ${year}`;
+      $('#inp_schoolyear').val(schoolYear);
       renderTableHeader();
       // xu ly chon file excel
       $('#inp-excel-file').on('change', function(e) {
         let file = e.target.files[0];
-        readExcelFile(file);
+        if (!file || (!file.name.endsWith('.xls') && !file.name.endsWith('.xlsx'))) {
+          file = null;
+          alert('File đầu vào không phải là file excel. Vui lòng thử lại!');
+        } else {
+          readExcelFile(file);
+        }
       });
       // xu ly chon sheet trong file excel.
       $('#sel_sheet').on('change', function(e) {
-        let sheetName = e.target.value;
+        let sheetName = $(this).val()
         if (sheetName) {
+          selectedSheet = sheetName;
           let sheetData = getDataOfSheet(sheetName);
+          sheetData = sheetData.filter((dt, i) => { return i >= (rowStartData - 1) })
           if (sheetData) {
             renderTableRowsOfDataSheet(sheetData);
           }
         }
       })
 
-      //
+      $('#start_row_data').on('keyup', function(e) {
+        let startValue = $(this).val();
+        startValue = !Number.isNaN(parseInt(startValue)) ? parseInt(startValue) : 3;
+        if (startValue !== rowStartData) {
+          let sheetName = $('#sel_sheet').val();
+          rowStartData = startValue;
+          let sheetData = getDataOfSheet(sheetName);
+          sheetData = sheetData.filter((dt, i) => { return i >= (rowStartData - 1) });
+          renderTableRowsOfDataSheet(sheetData)
+        }
+      });
+      $('#inp_semester').on('change', function(e) {
+        semester = $(this).val()
+      })
+      $('#inp_schoolyear').on('keyup', function(e) {
+        schoolYear = $(this).val()
+      })
+      $('#inp_schoolyear').on('change', function(e) {
+        schoolYear = $(this).val()
+      })
+      $('#btn_exp_report').on('click', function(e) {
+        if (!selectedSheet || !semester || !schoolYear) {
+          alert('Hãy chọn sheet, chọn học kỳ và nhập năm học để đọc dữ liệu từ file excel và xuất báo cáo!');
+        } else {
+          let sheetData = getDataOfSheet(selectedSheet);
+          if (!sheetData || !sheetData.length) {
+            alert('Sheet đã đọc không có dữ liệu! Hãy thử lại');
+          } else {
+            let grpInsData = groupDataByInstitute(sheetData);
+            for (let instituteCode in grpInsData) {
+              let institute = institutes.find(ins => {
+                return ins.shortname === instituteCode
+              })
+              if (institute) {
+                let reportSheetName = unsignedString(institute.name).split(' ').join('_').toUpperCase()
+                let reportSheetData = formatSheetReport(grpInsData[instituteCode], institute)
+                reportXLS[reportSheetName] = reportSheetData;
+              }
+            }
+            let wb = new ExcelJS.Workbook();
+            for (let rpSheetName in reportXLS) {
+              _addWorksheet(wb, rpSheetName, reportXLS[rpSheetName]);
+            }
+            let filename = 'BAO_CAO_BAN_SACH_HK_' + semester + '_NAM_HOC_' + schoolYear;
+            wb.xlsx.writeBuffer()
+              .then((buff) => {
+                saveAs(new Blob([buff]), `${filename.replace(/.xlsx|.xls/gi, '')}.xlsx`);
+              }).catch(err => {
+                alert('Không thể tạo file báo cáo. Vui lòng thử lại!')
+              })
+          }
+        }
+      })
     });
 
+    function formatSheetReport (sheetData, institute) {
+      let totalAmount = 0;
+      let semesterStr = semester == '1' ? 'I' : 'II'
+      let listCourse = Array.from(courses);
+      let coursesStr = listCourse.join(', ')
+      let rpSheetData = [
+        ['', '', '', '', '', '', '', '', ''],
+        ['BỘ LAO ĐỘNG THƯƠNG BINH & XÃ HỘI', '', '', 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM', '', '', '', '', ''],
+        ['TRƯỜNG CĐN BÁCH KHOA HÀ NỘI', '', '', 'Độc lập - Tự do - Hạnh phúc', '', '', '', '', ''],
+        ['Số:…………/BC-CĐNBK-ĐT&QLSV', '', '', `Hà Nội, ngày ${date} tháng ${month} năm ${year}`, '', '', '', '', ''],
+        ['BÁO CÁO', '', '', '', '', '', '', '', ''],
+        [`THỐNG KÊ BÁN SÁCH KỲ ${semesterStr} NĂM HỌC ${schoolYear} CHO SINH VIÊN K${coursesStr}`, '', '', '', '', '', '', '', ''],
+        ['KHOA ' + institute.name.toUpperCase(), '', '', '', '', '', '', '', ''],
+        ['STT', 'TÊN SÁCH', 'ĐT&QLSV', '', 'Số luợng bán sách kỳ ' + semester, '', '', 'Lớp mua', 'Số lượng tồn kho'],
+        ['', '', 'Số lượng còn lại', 'Nhập mới', 'SLượng', 'Giá', 'Thành tiền', '', ''],
+        ['', '', '', '', '', '', '', '', ''],
+      ]
+      rpSheetData[6][0] = 'KHOA ' + institute.name.toUpperCase();
+      let reportSheetColStyle = Object.assign({}, colStyle);
+      let reportSheetMergeCell = [...mergeCellHeader];
+      let reportSheetRowsStyle = {...rowsStyleHeader };
+      let reportSheetCellStyle = Object.assign({}, customCellHeader);
+      let rowIndex = 10;
+      let bookIndex = 0;
+      sheetData.sort((b1, b2) => {
+        return unsignedString(b1[0].bookName.toLowerCase()) <= unsignedString(b2[0].bookName.toLowerCase()) ? -1 : 1;
+      })
+      for (let bookInfo of sheetData) {
+        let bookName = bookInfo[0].bookName;
+        bookInfo.sort((c1, c2) => {
+          return naturalSort(unsignedString(c1.className.toLowerCase()), unsignedString(c2.className.toLowerCase()))
+        })
+        bookInfo.forEach((classBookInfo, idx) => {
+          totalAmount += parseInt(classBookInfo.amount);
+          if (idx === 0) {
+            rpSheetData[rowIndex + idx] = [
+              bookIndex + 1, bookName, '', '', classBookInfo.quantity, classBookInfo.price, classBookInfo.amount, classBookInfo.className, ''
+            ]
+            reportSheetMergeCell.push({ start: `A${rowIndex + 1}`, end: `A${(rowIndex + bookInfo.length)}`})
+            reportSheetMergeCell.push({ start: `B${rowIndex + 1}`, end: `B${(rowIndex + bookInfo.length)}`})
+            reportSheetMergeCell.push({ start: `C${rowIndex + 1}`, end: `C${(rowIndex + bookInfo.length)}`})
+            reportSheetMergeCell.push({ start: `D${rowIndex + 1}`, end: `D${(rowIndex + bookInfo.length)}`})
+            reportSheetMergeCell.push({ start: `I${rowIndex + 1}`, end: `I${(rowIndex + bookInfo.length)}`})
+          } else {
+            rpSheetData[rowIndex + idx] = [
+              '', '', '', '', classBookInfo.quantity, classBookInfo.price, classBookInfo.amount, classBookInfo.className, ''
+            ]
+          }
+          reportSheetRowsStyle[rowIndex + 1 + idx] = {height: 24}
+          let tableCellStyle = makeTableCellStyle(rowIndex+1 + idx)
+          reportSheetCellStyle = {
+            ...reportSheetCellStyle,
+            ...tableCellStyle
+          }
+        })
+        rowIndex += bookInfo.length;
+        
+        bookIndex += 1;
+      }
+      let totalAmountString = ConvertMoneyNumber2String.docso(totalAmount);
+      totalAmountString[0] = totalAmountString[0].toUpperCase();
+      rpSheetData = rpSheetData.concat([
+        ['TỔNG CỘNG', '', '', '', '', '', totalAmount, '', ''], //  ROW INDEX + 1
+        ['Bằng chữ: ' + totalAmountString + ' đồng chẵn', '', '', '', '', '', '', '', ''], // ROW INDEX + 2
+        ['NHẬP XUẤT GIÁO TRÌNH', '', '', 'THU TIỀN', '', '', 'TRƯỞNG PHÒNG ĐÀO TẠO', '', ''], // rOW INDEX + 3
+        ['', '', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', '', ''],
+        ['', '', '', '', '', '', '', '', ''],
+        ['Bùi Đình Nguyên', '', '', 'Đõ Thị Kim Học', '', '', 'Trần Thị Như Trang', '', ''],
+        ['', '', '', '', '', '', '', '', ''],
+        ['Nơi nhận:', '', '', '', '', '', '', '', ''],
+        ['', 'BGH: Để báo cáo;', '', '', '', '', '', '', ''],
+        ['', 'Phòng TCKT;', '', '', '', '', '', '', ''],
+        ['', 'Các khoa chuyên môn;', '', '', '', '', '', '', ''],
+        ['', 'Lưu ĐT&QLSV.', '', '', '', '', '', '', ''],
+      ])
+     let alignmentCenter = { 
+            horizontal: 'center',
+            vertical: 'middle',
+            wrapText: true
+        }
+      reportSheetRowsStyle[rowIndex+1] = { height: 52, font: { name: 'Times New Roman', size: '12', bold: false }, alignment: alignmentCenter };
+      reportSheetRowsStyle[rowIndex + 2] = { height: 52, font: { name: 'Times New Roman', size: '12', bold: true, italic: true }, alignment: alignmentCenter  };
+      reportSheetRowsStyle[rowIndex + 3] = { height: 18, font: { name: 'Times New Roman', size: '10', bold: true }, alignment: {...alignmentCenter, wrapText: false } };
+      reportSheetRowsStyle[rowIndex + 4] = { height: 18 };
+      reportSheetRowsStyle[rowIndex + 5] = { height: 18 };
+      reportSheetRowsStyle[rowIndex + 6] = { height: 18 };
+      reportSheetRowsStyle[rowIndex + 7] = { height: 18, font: { name: 'Times New Roman', size: '12', bold: true, italic: true }, alignment: {...alignmentCenter, wrapText: false }  };
+      reportSheetRowsStyle[rowIndex + 8] = { height: 18 };
+      reportSheetRowsStyle[rowIndex + 9] = { height: 18, font: { name: 'Arial', size: '12', bold: true }, alignment: { horizontal: 'left', vertical: 'middle', wrapText: true}  };
+      reportSheetRowsStyle[rowIndex + 10] = { height: 18, font: { name: 'Times New Roman', size: '12', bold: false }  };
+      reportSheetRowsStyle[rowIndex + 11] = { height: 18, font: { name: 'Times New Roman', size: '12', bold: false }  };
+      reportSheetRowsStyle[rowIndex + 12] = { height: 18, font: { name: 'Times New Roman', size: '12', bold: false } };
+      reportSheetRowsStyle[rowIndex + 13] = { height: 18, font: { name: 'Times New Roman', size: '12', bold: false }  };
+
+      reportSheetMergeCell = reportSheetMergeCell.concat([
+        { start: `A${rowIndex + 1}`, end: `F${rowIndex + 1}`},
+        { start: `A${rowIndex + 2}`, end: `I${rowIndex + 2}`},
+        { start: `A${rowIndex + 3}`, end: `C${rowIndex + 3}`},
+        { start: `D${rowIndex + 3}`, end: `F${rowIndex + 3}`},
+        { start: `G${rowIndex + 3}`, end: `I${rowIndex + 3}`},
+        { start: `A${rowIndex + 7}`, end: `C${rowIndex + 7}`},
+        { start: `D${rowIndex + 7}`, end: `F${rowIndex + 7}`},
+        { start: `G${rowIndex + 7}`, end: `I${rowIndex + 7}`},
+        { start: `A${rowIndex + 9}`, end: `B${rowIndex + 9}`}
+      ])
+      reportSheetCellStyle = {
+        ...reportSheetCellStyle,
+        ...makeTableCellStyle(rowIndex + 1),
+        [`A${rowIndex+1}`]: {
+          font: { name: 'Times New Roman', bold: true, size: '14' },
+          alignment : { horizontal: 'center', vertical: 'middle', wrapText: false },
+          border: borderCells
+        },
+        ...makeTableCellStyle(rowIndex + 2),
+        [`A${rowIndex+2}`]: {
+          font: { name: 'Times New Roman', size: '12', bold: true, italic: true },  
+          border: borderCells,
+        },
+        [`A${rowIndex+3}`]: {
+          font: { name: 'Times New Roman', size: '10', bold: true }
+        },
+        [`A${rowIndex+7}`]: {
+          font: { name: 'Times New Roman', size: '12', bold: true, italic: true }
+        },
+        [`A${rowIndex+9}`]: {
+          font: { name: 'Arial', size: '12', bold: true }
+        },
+        
+        [`B${rowIndex+10}`]: {
+          font: { name: 'Times New Roman', size: '10', bold: false }
+        },
+        [`B${rowIndex+11}`]: {
+          font: { name: 'Times New Roman', size: '10', bold: false }
+        },
+        [`B${rowIndex+12}`]: {
+          font: { name: 'Times New Roman', size: '10', bold: false }
+        },
+        [`B${rowIndex+13}`]: {
+          font: { name: 'Times New Roman', size: '10', bold: false }
+        }
+      }
+
+      return {
+        data: rpSheetData,
+        rows: reportSheetRowsStyle,
+        cols:  reportSheetColStyle,
+        cells: reportSheetCellStyle,
+        mergeCells: reportSheetMergeCell,
+      }
+    }
+
+    function makeTableCellStyle (row, cols = ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']) {
+      let cellStyle = {}
+      cols.forEach((col) => {
+        cellStyle[col + row] = { 
+          border: borderCells, 
+          font: { 
+            name: 'Times New Roman',
+            size: col == 'H' ? '11' : '12',
+            bold: col === 'A' || col == 'B' || col == 'C',
+          },
+          alignment : { 
+            horizontal: col == 'G' ? 'right' : 'center',
+            vertical: 'middle',
+            wrapText: col != 'H'
+          }
+        }
+      })
+      return cellStyle;
+    }
+
+    function _addWorksheet(wb, nameSheet = "", _data) {
+      let {
+        data = [],
+        rows = {},
+        cols = {},
+        cells = {},
+        mergeCells = [],
+        ...settings
+      } = _data;
+
+      const ws = wb.addWorksheet(nameSheet);
+
+      data.forEach(item => ws.addRow(item));
+
+      // custom data row
+      Object.keys(rows).forEach(rowKey => {
+        let options = rows[rowKey];
+        Object.keys(options).forEach(optionKey => {
+          ws.getRow(rowKey)[optionKey] = options[optionKey];
+        });
+      });
+
+      // cusotm columns
+      Object.keys(cols).forEach(colKey => {
+        colKey = _getNameColumnsExcel(colKey);
+        let options = cols[colKey];
+
+        Object.keys(options).forEach(optionKey => {
+            ws.getColumn(colKey)[optionKey] = options[optionKey];
+        });
+      });
+
+      // custom cells
+      Object.keys(cells).forEach(cellKey => {
+        let options = cells[cellKey];
+        Object.keys(options).forEach(optionKey => {
+            ws.getCell(cellKey)[optionKey] = options[optionKey];
+        });
+      });
+
+      // mergerCell
+      mergeCells.forEach(item => ws.mergeCells(`${item.start}:${item.end}`));
+
+      // add settings
+      Object.keys(settings).forEach(key => {
+        if(typeof settings[key] !== 'function') 
+          ws[key] = settings[key];
+      })
+      ws.autoFilter = 'A2:K10'
+      return ws;
+    }
+
+    function _getNameColumnsExcel(name) {
+      name += "";
+      // Nếu là số
+      if (name.search(/\D/i) === -1) {  
+        name = parseInt(name);
+      }
+      return name;
+    }
+
+    // Render option các sheet name trong file để ng dùng chọn
     function renderSelectSheetField(sheets) {
       let optionEle = '<option value="">Chọn sheet dữ liệu...</option>';
       if (Array.isArray(sheets)) {
@@ -213,49 +757,66 @@
 
       $('#sel_sheet').html(optionEle);
     }
-
+    // Render tiêu đề các cột trong bảng.
     function renderTableHeader () {
-      tblHeader = ''
+      tblHeader = '<th style="width: 70px">STT</th>';
       fields.forEach((field) => {
-        tblHeader += `<th style="width: ${field.width || '10%'}">${field.displayName} (${field.columnLabel})<th>`
+        tblHeader += `<th style="width: ${field.width || '10%'}">${field.displayName} (${field.columnLabel})</th>`;
       })
       $('#table_header').html(tblHeader)
     }
-
+    // Render dữ liệu excel ra bảng để hiển thị lại để đối chiếu.
     function renderTableRowsOfDataSheet (data) {
-      console.log('data', data);
-      let rows = '';
-      data.forEach((dt, i) => {
-        if (i >= startRowToGetData - 1) {
-          let row = '';
+      let trows = '';
+      data.forEach((dt, index) => {
+        courses.add(dt.course);
+        let trow = `<tr><td>${index + 1}</td>`;
+        for (let field of fields) {
+          let fieldValue = dt[field.name] || " ";
+          trow += `<td style="${field.style || ''}">${fieldValue}</td>`;
         }
+        trow += '</tr>';
+        trows += trow;
       })
+      $('#table_body').html(trows);
     }
-
+    // Đọc dữ liệu từ file excel
     function readExcelFile(file) {
       onLoad = true;
       let reader = new FileReader();
-      toggleFormControl()
+
       reader.onload = function(e) {
         let data = e.target.result;
         workbook = XLSX.read(data, {
           type: 'binary'
         });
         workbook.SheetNames.forEach((sheetName) => {
-          let  sheetDataObj = XLSX.utils.sheet_to_row_object_array(workbook.Sheets[sheetName]);
-          sheetsData[sheetName] = sheetDataObj;
+          let workSheet = workbook.Sheets[sheetName];
+          let { nameRow=[], colStart } = getNameRow(workSheet);
+          let  dataObj = XLSX.utils.sheet_to_json(workSheet, {header: 1, blankrows: false});
+          let cols = make_cols(workSheet['!ref'], colStart);
+          dataObj.forEach((d_item, d_index) => {
+            let itemDataRow = {};
+            cols.forEach((c_item, c_index) => {
+              itemDataRow[c_item] = d_item[c_index];      // Map name col excel with data
+            })
+            itemDataRow["positionRow"] = nameRow[d_index];  // Thêm vị trí row trong excel
+            dataObj[d_index] = itemDataRow;
+          })
+          sheetsData[sheetName] = makeDataObjects(dataObj);
         })
         renderSelectSheetField(workbook.SheetNames);
         onLoad = false;
-        toggleFormControl();
+
         return
       };
       reader.onerror = function(ex) {
-        console.log(ex);
+        alert('Đã có lỗi xảy ra! Vui lòng kiểm tra lại file excel đầu vào!')
       };
       reader.readAsBinaryString(file);
     }
-
+    
+    // Lấy dữ liệu của sheet.
     function getDataOfSheet(sheetName) {
       let sheetData = sheetsData[sheetName] || [];
       return sheetData;
@@ -268,6 +829,284 @@
       } else {
         $('#sel_sheet').prop('disabled', false);
         $('#btn-configure').prop('disabled', false);
+      }
+    }
+
+    // Lấy danh sách các dòng
+    function getNameRow (wk = {}) {
+      try {
+        let _wk  = {...wk}
+        delete _wk["!margins"];
+        delete _wk["!merges"];
+        delete _wk["!ref"];
+        let response  = []
+        let cellStart = Object.keys(_wk)[0];
+        let colStart  = typeof cellStart == "string" ? cellStart.replace(/\d*/gi, "") : undefined;
+        let keys      = Object.keys(_wk).map(i => parseInt(i.replace(/\D*/gi, "")));               // Xóa chữ: A1 => 1
+        keys.forEach(i => {
+            if(response.indexOf(i) <= -1) response.push(i)                                      // Kiểm tra không tồn tại
+        })
+        response = response.sort((a, b) => (a > b));
+
+        return {colStart: colStart, nameRow: response};
+      } catch (e) { console.warn(e); }
+
+      return {colStart: undefined, nameRow: []}
+    }
+    // Lấy danh sách các cột
+    function make_cols (refstr, colStart) {
+      if(typeof refstr == "undefined") return []
+      let cols =  Array.from( 
+          {length: XLSX.utils.decode_range(refstr).e.c + 1},  
+          (x,i) => XLSX.utils.encode_col(i)
+      );
+      if(!colStart) return cols;
+      return cols.filter(col => col >= colStart);
+    }
+
+    // Chuyển đổi dữ liệu excel thành array-objects với key tưong ứng để dễ xử lý.
+    function makeDataObjects (rowData) {
+      let data = rowData.map((row) => {
+        let obj = {}
+        for (let field of fields) {
+          obj[field.name] = row[field.columnLabel] || null
+        }
+
+        return obj;
+      })
+
+      return data;
+    }
+
+    // Tổng hợp dữ liệu theo từng khoa
+    function groupDataByInstitute (data) {
+      let grpData = {
+        ck: [],
+        cntt: [],
+        dtvt: [],
+        ktql: [],
+        dien: [],
+        khoa_cb: []
+      };
+      for (let dt of data) {
+        let institute = institutes.find((ins) => {
+          let unsignedName = dt.institute ? unsignedString(dt.institute.toLowerCase()) : ''
+          return dt.institute == ins.shortname || dt.institute == ins.name || ins.keywords.includes(unsignedName)
+        });
+        if (institute) {
+          if (grpData[institute.shortname]) {
+            grpData[institute.shortname].push(dt);
+          } else {
+            grpData[institute.shortname] = [dt];
+          }
+        } else {
+          grpData['khoa_cb'].push(dt);
+        }
+      }
+      for (let instituteName in grpData) {
+        let bookData = grpData[instituteName];
+        let grpBookData = groupByBookName(bookData);
+        grpData[instituteName] = grpBookData;
+      }
+
+      return grpData;
+    }
+
+    // Tổng hợp dữ liệu bán sách của khoa theo từng đầu sách.
+    function groupByBookName(bookData) {
+      let grpBookData = {};
+
+      for (let bookDt of bookData) {
+        let bookKey = makeBooKKey(bookDt.bookName)
+        if (grpBookData[bookKey]) {
+          grpBookData[bookKey].push(bookDt);
+        } else {
+          grpBookData[bookKey] = [bookDt];
+        }
+      }
+      for (let bookKeyName in grpBookData) {
+        grpBookData[bookKeyName] = groupBookDataByClass(grpBookData[bookKeyName]);
+      }
+
+      return Object.values(grpBookData);
+    }
+
+    function groupBookDataByClass (grpBookData) {
+      let grpClassBookData = {}
+      for (let bookDt of grpBookData) {
+        let classKey = makeClassKey(bookDt.className);
+        if (grpClassBookData[classKey]) {
+          grpClassBookData[classKey].push(bookDt);
+        } else {
+          grpClassBookData[classKey] = [bookDt];
+        }
+      }
+      for (let classKey in grpClassBookData) {
+        let bookInClass = grpClassBookData[classKey]
+        let quantity = 0;
+        let price = bookInClass[0].price;
+        bookInClass.forEach((binClass) => {
+          quantity += binClass.quantity || 0;
+        })
+        let amount = price * quantity;
+        grpClassBookData[classKey] = {
+          bookName: bookInClass[0].bookName,
+          className: bookInClass[0].className + '-' + ('K' + bookInClass[0].course),
+          quantity,
+          price,
+          amount
+        }
+      }
+
+      return Object.values(grpClassBookData);
+    }
+
+    function unsignedString(inputStr) {
+      inputStr = inputStr ? inputStr.trim() : ''
+      if (inputStr.length > 0) {
+        inputStr = inputStr.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ|À|Á|Ạ|Ả|Ã|Â|Ầ|Ấ|Ậ|Ẩ|Ẫ|Ă|Ằ|Ắ|Ặ|Ẳ|Ẵ/g, 'a')
+        inputStr = inputStr.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ|È|É|Ẹ|Ẻ|Ẽ|Ê|Ề|Ế|Ệ|Ể|Ễ/g, 'e')
+        inputStr = inputStr.replace(/ì|í|ị|ỉ|ĩ|Ì|Í|Ị|Ỉ|Ĩ/g, 'i')
+        inputStr = inputStr.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ|Ò|Ó|Ọ|Ỏ|Õ|Ô|Ồ|Ố|Ộ|Ổ|Ỗ|Ơ|Ờ|Ớ|Ợ|Ở|Ỡ/g, 'o')
+        inputStr = inputStr.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ|Ù|Ú|Ụ|Ủ|Ũ|Ư|Ừ|Ứ|Ự|Ử|Ữ/g, 'u')
+        inputStr = inputStr.replace(/ỳ|ý|ỵ|ỷ|ỹ|Ỳ|Ý|Ỵ|Ỷ|Ỹ/g, 'y')
+        inputStr = inputStr.replace(/đ|Đ/g, 'd')
+      }
+
+      return inputStr
+    }
+
+    
+    function makeBooKKey(bookName) {
+      bookName = unsignedString(bookName).toLowerCase();
+      return bookName.split(' ').join('_');
+    }
+
+    function makeClassKey(className) {
+      className = unsignedString(className).toLowerCase()
+      return className.split(' ').join('_')
+    }
+
+    function naturalSort (a, b) {
+      var re = /(^([+\-]?\d+(?:\.\d*)?(?:[eE][+\-]?\d+)?(?=\D|\s|$))|^0x[\da-fA-F]+$|\d+)/g,
+        sre = /^\s+|\s+$/g,   // trim pre-post whitespace
+        snre = /\s+/g,        // normalize all whitespace to single ' ' character
+        dre = /(^([\w ]+,?[\w ]+)?[\w ]+,?[\w ]+\d+:\d+(:\d+)?[\w ]?|^\d{1,4}[\/\-]\d{1,4}[\/\-]\d{1,4}|^\w+, \w+ \d+, \d{4})/,
+        hre = /^0x[0-9a-f]+$/i,
+        ore = /^0/,
+        i = function(s) {
+            return (naturalSort.insensitive && ('' + s).toLowerCase() || '' + s).replace(sre, '');
+        },
+        // convert all to strings strip whitespace
+        x = i(a),
+        y = i(b),
+        // chunk/tokenize
+        xN = x.replace(re, '\0$1\0').replace(/\0$/,'').replace(/^\0/,'').split('\0'),
+        yN = y.replace(re, '\0$1\0').replace(/\0$/,'').replace(/^\0/,'').split('\0'),
+        // numeric, hex or date detection
+        xD = parseInt(x.match(hre), 16) || (xN.length !== 1 && Date.parse(x)),
+        yD = parseInt(y.match(hre), 16) || xD && y.match(dre) && Date.parse(y) || null,
+        normChunk = function(s, l) {
+            // normalize spaces; find floats not starting with '0', string or 0 if not defined (Clint Priest)
+            return (!s.match(ore) || l == 1) && parseFloat(s) || s.replace(snre, ' ').replace(sre, '') || 0;
+        },
+        oFxNcL, oFyNcL;
+      // first try and sort Hex codes or Dates
+      if (yD) {
+        if (xD < yD) { return -1; }
+        else if (xD > yD) { return 1; }
+      }
+      // natural sorting through split numeric strings and default strings
+      for(var cLoc = 0, xNl = xN.length, yNl = yN.length, numS = Math.max(xNl, yNl); cLoc < numS; cLoc++) {
+        oFxNcL = normChunk(xN[cLoc] || '', xNl);
+        oFyNcL = normChunk(yN[cLoc] || '', yNl);
+        // handle numeric vs string comparison - number < string - (Kyle Adams)
+        if (isNaN(oFxNcL) !== isNaN(oFyNcL)) {
+          return isNaN(oFxNcL) ? 1 : -1;
+        }
+        // if unicode use locale comparison
+        if (/[^\x00-\x80]/.test(oFxNcL + oFyNcL) && oFxNcL.localeCompare) {
+            var comp = oFxNcL.localeCompare(oFyNcL);
+          return comp / Math.abs(comp);
+        }
+        if (oFxNcL < oFyNcL) { return -1; }
+        else if (oFxNcL > oFyNcL) { return 1; }
+      }
+    }
+
+    const mangso = ['không','một','hai','ba','bốn','năm','sáu','bảy','tám','chín']
+
+    class ConvertMoneyNumber2String {
+      static docso (so) {
+        if (so == 0)
+          return mangso[0]; var chuoi = "", hauto = ""
+        do {
+          let ty = so%1000000000; so = Math.floor(so/1000000000) 
+          if (so > 0) { 
+            chuoi = this.dochangtrieu(ty, true) + hauto + chuoi 
+          } else {
+            chuoi = this.dochangtrieu(ty, false) + hauto + chuoi
+          }
+          hauto = " tỷ"
+        } while (so > 0)
+        return chuoi
+      }
+      static dochangchuc (so, daydu) {
+        let  chuoi = ""
+        let chuc = Math.floor(so / 10)
+        let donvi = so % 10
+        if (chuc > 1) {
+          chuoi = " " + mangso[chuc] + " mươi"
+          if (donvi==1) {
+            chuoi += " mốt"
+          }
+        } else if (chuc === 1) {
+          chuoi = " mười"
+          if (donvi == 1) {
+            chuoi += " một"
+          }
+        } else if (daydu && donvi > 0) {
+          chuoi = " lẻ"
+        }
+        if (donvi == 5 && chuc > 1) {
+          chuoi += " lăm"
+        } else if (donvi > 1 || (donvi === 1 && chuc === 0)) {
+          chuoi += " " + mangso[donvi]
+        }
+        return chuoi
+      }
+
+      static docblock (so, daydu) {
+        let chuoi = ""
+        let tram = Math.floor(so / 100)
+        so = so % 100
+        if (daydu || tram > 0) {
+          chuoi = " " + mangso[tram] + " trăm"
+          chuoi += this.dochangchuc(so, true)
+        } else {
+          chuoi = this.dochangchuc(so, false)
+        }
+        return chuoi
+      }
+
+      static dochangtrieu (so, daydu) { 
+        let chuoi = ""
+        let trieu = Math.floor(so / 1000000)
+        so = so % 1000000
+        if (trieu > 0) { 
+          chuoi = this.docblock(trieu, daydu) + " triệu"
+          daydu = true
+        } 
+        let nghin = Math.floor(so / 1000)
+        so = so % 1000
+        if (nghin > 0) { 
+          chuoi += this.docblock(nghin, daydu) + " nghìn"
+          daydu = true
+        } 
+        if (so > 0) { 
+          chuoi += this.docblock(so, daydu)
+        } 
+        return chuoi
       }
     }
   </script>
