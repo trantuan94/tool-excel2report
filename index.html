@@ -576,8 +576,8 @@
         
         bookIndex += 1;
       }
-      let totalAmountString = ConvertMoneyNumber2String.docso(totalAmount);
-      totalAmountString[0] = totalAmountString[0].toUpperCase();
+      let totalAmountString = toUpperFirst(ConvertMoneyNumber2String.docso(totalAmount));
+
       rpSheetData = rpSheetData.concat([
         ['TỔNG CỘNG', '', '', '', '', '', totalAmount, '', ''], //  ROW INDEX + 1
         ['Bằng chữ: ' + totalAmountString + ' đồng chẵn', '', '', '', '', '', '', '', ''], // ROW INDEX + 2
@@ -1112,6 +1112,9 @@
         } 
         return chuoi
       }
+    }
+    function toUpperFirst (str) {
+      return str.charAt(0).toUpperCase() + str.slice(1);
     }
   </script>
 </html>
